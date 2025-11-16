@@ -1,0 +1,7 @@
+transformers
+torch
+datasets
+evaluate
+accelerate
+sentencepiece
+matplotlib
