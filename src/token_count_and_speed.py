@@ -7,14 +7,14 @@ import matplotlib.pyplot as plt
 from transformers import AutoTokenizer
 
 # 1 CONFIGURATION
-NUM_SENTENCES = 500   #less then 1000 
+NUM_SENTENCES = 500   #less then 1000
 DATA_PATH = "data/italian_corpus.txt"
 
 TOKENIZERS = {
     "LLaMA3.1-Base": "meta-llama/Llama-3.1-8B",
     "LAPT": "SemanticAlignment/Llama-3.1-8B-Italian-LAPT",
     "SAVA": "SemanticAlignment/Llama-3.1-8B-Italian-SAVA",
-    "FVT":  "SemanticAlignment/Llama-3.1-8B-Italian-FVT"
+    "FVT":  "SemanticAlignment/Llama-3-1-8B-Italian-FVT"
 }
 
 OUTPUT_CSV = "results/token_count_and_speed.csv"

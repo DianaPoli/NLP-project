@@ -15,7 +15,7 @@ TOKENIZERS = {
     "LLaMA3.1-Base": "meta-llama/Llama-3.1-8B",
     "LAPT": "SemanticAlignment/Llama-3.1-8B-Italian-LAPT",
     "SAVA": "SemanticAlignment/Llama-3.1-8B-Italian-SAVA",
-    "FVT":  "SemanticAlignment/Llama-3.1-8B-Italian-FVT"
+    "FVT":  "SemanticAlignment/Llama-3-1-8B-Italian-FVT"
 }
 
 OUTPUT_CSV = "results/fertility_results.csv"
@@ -60,6 +60,8 @@ def main():
         results[name] = compute_fertility_for_tokenizer(name, path, sentences)
 
     # 4. Save CSV
+    import os
+    os.makedirs("results", exist_ok=True)
     print("\nSaving results to CSV")
     with open(OUTPUT_CSV, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
