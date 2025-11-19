@@ -1,7 +1,6 @@
-transformers
-torch
-datasets
-evaluate
-accelerate
-sentencepiece
-matplotlib
+transformers==4.42.2
+torch==2.1.0
+datasets==2.14.2
+tqdm==4.65.0
+matplotlib==3.7.1
+sentencepiece==0.1.99
