@@ -10,6 +10,7 @@ from transformers import AutoTokenizer
 SEED = 42
 NUM_SENTENCES = 1000   #number of sentences to sample
 DATA_PATH = "data/italian_corpus.txt"  #path to the Italian text corpus
+random.seed(SEED)
 
 #Tokenizers to compare
 TOKENIZERS = {

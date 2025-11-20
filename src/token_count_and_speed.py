@@ -10,6 +10,7 @@ from transformers import AutoTokenizer
 SEED = 42
 NUM_SENTENCES = 500   #less then 1000
 DATA_PATH = "data/italian_corpus.txt"
+random.seed(SEED)
 
 TOKENIZERS = {
     "LLaMA3.1-Base": "meta-llama/Llama-3.1-8B",
@@ -72,6 +73,8 @@ def main():
         }
 
     #4  Save CSV
+    import os
+    os.makedirs("results", exist_ok=True)
     print("\nSaving CSV")
     with open(OUTPUT_CSV, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
