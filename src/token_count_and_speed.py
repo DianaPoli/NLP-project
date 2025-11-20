@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from transformers import AutoTokenizer
 
 # 1 CONFIGURATION
+SEED = 42
 NUM_SENTENCES = 500   #less then 1000
 DATA_PATH = "data/italian_corpus.txt"
 
