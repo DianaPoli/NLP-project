@@ -1,0 +1,4 @@
+Model,BLEU,ROUGE-L,Avg_Latency_MT_sec,Avg_Latency_QA_sec,Token_Reduction_Observed
+LLaMA3.1-Base,0.3334,0.0937,1.7680,0.8337,22.31%
+LAPT-Rilasciato,0.3486,0.1958,1.7569,1.0628,22.31%
+SAVA-Rilasciato,0.2805,0.2309,1.7412,1.0481,22.31%

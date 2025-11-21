@@ -17,3 +17,4 @@ tqdm              # optional progress bars
 
 # Optional (not strictly needed, but useful for data handling)
 pandas>=2.1.0
+accelerate

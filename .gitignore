@@ -1,0 +1,16 @@
+# Ignora i modelli PyTorch pesanti e i file generati
+# I modelli stessi devono essere scaricati dall'utente (per via delle licenze)
+
+# File temporanei
+*.ipynb_checkpoints
+__pycache__/
+
+# File di grandi dimensioni (risultati intermedi)
+*.pt
+*.bin
+*.safetensors
+*.pth
+
+# Ignora i file di risultati troppo grandi (opzionale)
+# Se i tuoi file .csv sono piccoli (come in questo caso), puoi rimuovere l'hash '#' sotto
+# results/generation_results_final.csv
