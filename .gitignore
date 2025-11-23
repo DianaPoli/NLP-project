@@ -14,3 +14,5 @@ __pycache__/
 # Ignora i file di risultati troppo grandi (opzionale)
 # Se i tuoi file .csv sono piccoli (come in questo caso), puoi rimuovere l'hash '#' sotto
 # results/generation_results_final.csv
+
+summary.md
