@@ -18,3 +18,7 @@ tqdm              # optional progress bars
 # Optional (not strictly needed, but useful for data handling)
 pandas>=2.1.0
 accelerate
+peft
+safetensors
+# Hugging Face Hub: pin to <1.0 for compatibility with installed transformers
+huggingface_hub<1.0,>=0.34.0

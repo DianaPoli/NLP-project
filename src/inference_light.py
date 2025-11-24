@@ -17,7 +17,8 @@ DATA_PATH = "data/italian_corpus.txt"
 MODELS = {
     "LLaMA3.1-Base": "meta-llama/Llama-3.1-8B",
     "LAPT": "SemanticAlignment/Llama-3.1-8B-Italian-LAPT",
-    "SAVA": "SemanticAlignment/Llama-3.1-8B-Italian-SAVA",
+    # Use the locally trained SAVA artifacts
+    "SAVA": "results/sava_ct",
     "FVT":  "SemanticAlignment/Llama-3-1-8B-Italian-FVT"
 }
 
@@ -74,14 +75,96 @@ def main():
     for name, path in MODELS.items():
         print(f"\nProcessing model: {name} ({path})")
 
+        # Load tokenizer (local-first) with fallback
         try:
             tokenizer = AutoTokenizer.from_pretrained(path)
-            model = AutoModelForCausalLM.from_pretrained(path, device_map="auto")
-            model.eval()
         except Exception as e:
-            print(f"Failed to load {name}: {e}")
-            results[name] = None
-            continue
+            print(f"Warning: could not load tokenizer for {name} ({path}): {e}")
+            try:
+                tokenizer = AutoTokenizer.from_pretrained(path, use_fast=False)
+            except Exception as e2:
+                print(f"Failed to load tokenizer for {name}: {e2}. Skipping.")
+                results[name] = None
+                continue
+
+        # Try to detect a local PEFT adapter and apply it (SAVA)
+        model = None
+        adapter_dir = None
+        if isinstance(path, str) and os.path.isdir(path):
+            candidates = [
+                os.path.join(path, "adapter_model.safetensors"),
+                os.path.join(path, "adapter_model.safetensor"),
+                os.path.join(path, "pytorch_model.bin"),
+                os.path.join(path, "pytorch_model.safetensors"),
+                os.path.join(path, "model.safetensors"),
+            ]
+            if any(os.path.exists(p) for p in candidates):
+                adapter_dir = path
+
+        if adapter_dir:
+            try:
+                from peft import PeftModel
+
+                cfg_path = os.path.join(adapter_dir, "adapter_config.json")
+                base_model = None
+                if os.path.exists(cfg_path):
+                    try:
+                        import json as _json
+                        with open(cfg_path, "r", encoding="utf-8") as fh:
+                            cfg = _json.load(fh)
+                            base_model = cfg.get("base_model_name_or_path")
+                    except Exception:
+                        base_model = None
+
+                if base_model is None:
+                    raise RuntimeError("Adapter config missing base model name")
+
+                print(f"Loading base model '{base_model}' and applying adapter from '{adapter_dir}'")
+                base = AutoModelForCausalLM.from_pretrained(
+                    base_model,
+                    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+                    low_cpu_mem_usage=True,
+                )
+
+                # Resize embeddings to match tokenizer vocab if needed
+                try:
+                    tok_vocab_size = getattr(tokenizer, "vocab_size", None)
+                    if tok_vocab_size is None:
+                        try:
+                            tok_vocab_size = len(tokenizer)
+                        except Exception:
+                            tok_vocab_size = None
+
+                    base_vocab_size = None
+                    try:
+                        base_vocab_size = base.get_input_embeddings().weight.shape[0]
+                    except Exception:
+                        base_vocab_size = getattr(base.config, "vocab_size", None)
+
+                    if tok_vocab_size and base_vocab_size and tok_vocab_size != base_vocab_size:
+                        print(f"Resizing base model embeddings from {base_vocab_size} to {tok_vocab_size} to match tokenizer.")
+                        base.resize_token_embeddings(tok_vocab_size)
+                except Exception as e_resize:
+                    print("Warning: failed to resize token embeddings:", e_resize)
+
+                model = PeftModel.from_pretrained(base, adapter_dir)
+                model.eval()
+                if torch.cuda.is_available():
+                    model.to("cuda")
+
+            except Exception as e:
+                print(f"Failed to load/apply SAVA adapter for {name} (falling back): {e}")
+                model = None
+
+        # Fallback: load model directly from path (HF/local)
+        if model is None:
+            try:
+                model = AutoModelForCausalLM.from_pretrained(path, device_map="auto")
+                model.eval()
+            except Exception as e:
+                print(f"Failed to load model for {name}: {e}")
+                results[name] = None
+                continue
 
         try:
             avg_time = measure_inference_time_light(tokenizer, model, sentences)
