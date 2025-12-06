@@ -5,18 +5,24 @@ import random
 import time
 import matplotlib.pyplot as plt
 from transformers import AutoTokenizer
+import os
+import torch
 
 # 1 CONFIGURATION
 SEED = 42
-NUM_SENTENCES = 500   #less then 1000
+NUM_SENTENCES = 500  # less then 1000
 DATA_PATH = "data/italian_corpus.txt"
 random.seed(SEED)
 
+MY_SAVA_ADAPTER_DIR = "./results/mct_sava_output"
+
+# Tokenizers to compare
 TOKENIZERS = {
     "LLaMA3.1-Base": "meta-llama/Llama-3.1-8B",
-    "LAPT": "SemanticAlignment/Llama-3.1-8B-Italian-LAPT",
-    "SAVA": "SemanticAlignment/Llama-3.1-8B-Italian-SAVA",
-    "FVT":  "SemanticAlignment/Llama-3-1-8B-Italian-FVT"
+    "LAPT-HF": "SemanticAlignment/Llama-3.1-8B-Italian-LAPT",
+    "SAVA-HF": "SemanticAlignment/Llama-3.1-8B-Italian-SAVA",
+    "FVT-HF": "SemanticAlignment/Llama-3-1-8B-Italian-FVT",
+    "SAVA-MCT-REPRODUCED": MY_SAVA_ADAPTER_DIR, 
 }
 
 OUTPUT_CSV = "results/token_count_and_speed.csv"
@@ -29,7 +35,8 @@ def load_sentences(path, num):
     #Load N sentences from file.
     with open(path, "r", encoding="utf-8") as f:
         lines = [l.strip() for l in f.readlines() if len(l.strip().split()) > 3]
-    return random.sample(lines, num)
+    return random.sample(lines, min(num, len(lines)))
+
 
 def count_tokens(tokenizer, text):
     #Return number of tokens for a sentence.
@@ -38,6 +45,10 @@ def count_tokens(tokenizer, text):
 def measure_tokenization_time(tokenizer, sentences):
     #Measure average time to tokenize a sentence.
     times = []
+    if sentences:
+        for _ in range(5):
+            tokenizer(sentences[0])
+            
     for s in sentences:
         start = time.perf_counter()
         tokenizer(s)
@@ -54,8 +65,13 @@ def main():
     results = {}
 
     for name, path in TOKENIZERS.items():
+        if name == "SAVA-MCT-REPRODUCED" and not os.path.isdir(path):
+            print(f"\nSkipping {name}: Local training directory not found at {path}. (Run sava_mini_train.py first)")
+            continue
+            
         print(f"\nProcessing tokenizer: {name} ({path})")
-        tok = AutoTokenizer.from_pretrained(path)
+        
+        tok = AutoTokenizer.from_pretrained(path, trust_remote_code=True) 
 
         # token count average
         token_counts = [count_tokens(tok, s) for s in sentences]
@@ -72,10 +88,17 @@ def main():
             "time": avg_time
         }
 
-    #4  Save CSV
-    import os
+    # 4  Save CSV
     os.makedirs("results", exist_ok=True)
     print("\nSaving CSV")
+    
+    mistral_count = results.get("LLaMA3.1-Base", {}).get("count")
+    reproduced_count = results.get("SAVA-MCT-REPRODUCED", {}).get("count")
+    
+    if mistral_count is not None and reproduced_count is not None:
+        reduction = (mistral_count - reproduced_count) / mistral_count
+        print(f"Total Token Reduction (Reproduced Model): {reduction:.2%}")
+
     with open(OUTPUT_CSV, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["Tokenizer", "AvgTokenCount", "AvgTokenizationTime"])
@@ -87,7 +110,7 @@ def main():
     counts = [results[n]["count"] for n in names]
 
     plt.figure(figsize=(10, 6))
-    plt.bar(names, counts, color=["gray", "green", "blue", "orange"])
+    plt.bar(names, counts, color=["gray", "green", "blue", "orange", "purple"])
     plt.title("Average Token Count Comparison")
     plt.ylabel("Average number of tokens")
     plt.savefig(PLOT_COUNT)
@@ -97,7 +120,7 @@ def main():
     times = [results[n]["time"] for n in names]
 
     plt.figure(figsize=(10, 6))
-    plt.bar(names, times, color=["gray", "green", "blue", "orange"])
+    plt.bar(names, times, color=["gray", "green", "blue", "orange", "purple"])
     plt.title("Average Tokenization Speed")
     plt.ylabel("Seconds per sentence")
     plt.savefig(PLOT_SPEED)

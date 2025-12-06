@@ -16,3 +16,5 @@ __pycache__/
 # results/generation_results_final.csv
 
 summary.md
+fertility_experiment_old.py
+token_count_and_speed_old.py

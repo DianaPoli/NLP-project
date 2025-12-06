@@ -2,22 +2,27 @@
 
 import csv
 import random
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt 
 from transformers import AutoTokenizer
-
+import os
+import torch
 
 # 1. CONFIGURATION
 SEED = 42
-NUM_SENTENCES = 1000   #number of sentences to sample
-DATA_PATH = "data/italian_corpus.txt"  #path to the Italian text corpus
+NUM_SENTENCES = 1000 
+DATA_PATH = "data/italian_corpus.txt"
 random.seed(SEED)
 
-#Tokenizers to compare
+# Definisci il percorso del tuo modello addestrato in Mini-CT
+# MY_SAVA_ADAPTER_DIR = "./results/mct_sava_output"
+
+# Tokenizers to compare 
 TOKENIZERS = {
     "LLaMA3.1-Base": "meta-llama/Llama-3.1-8B",
-    "LAPT": "SemanticAlignment/Llama-3.1-8B-Italian-LAPT",
-    "SAVA": "SemanticAlignment/Llama-3.1-8B-Italian-SAVA",
-    "FVT":  "SemanticAlignment/Llama-3-1-8B-Italian-FVT"
+    "LAPT-HF": "SemanticAlignment/Llama-3.1-8B-Italian-LAPT",
+    "SAVA-HF": "SemanticAlignment/Llama-3.1-8B-Italian-SAVA",
+    "FVT-HF": "SemanticAlignment/Llama-3-1-8B-Italian-FVT",
+    "SAVA-MCT": "./results/mct_sava_output", 
 }
 
 OUTPUT_CSV = "results/fertility_results.csv"
@@ -33,12 +38,16 @@ def load_sentences(path, num):
 
 def token_fertility(tokenizer, text):
     #Token fertility = num_token / num_words
-    return len(tokenizer(text).input_ids) / len(text.split())
+    num_words = len(text.split())
+    if num_words == 0:
+        return 0.0
+    return len(tokenizer(text).input_ids) / num_words
 
 
 def compute_fertility_for_tokenizer(name, tokenizer_id, sentences):
     print(f"\nCalculating fertility for: {name} ({tokenizer_id})")
-    tokenizer = AutoTokenizer.from_pretrained(tokenizer_id)
+    
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_id, trust_remote_code=True)
 
     fertilities = []
     for sent in sentences:
@@ -59,28 +68,52 @@ def main():
 
     # Compute fertility for each tokenizer
     for name, path in TOKENIZERS.items():
+        if name == "SAVA-MCT" and not os.path.exists(path):
+            print(f"Skipping {name}: Local adapter directory not found at {path}.")
+            continue
+            
         results[name] = compute_fertility_for_tokenizer(name, path, sentences)
 
-    # 4. Save CSV
-    import os
+    # 4. Efficiency analysis
+    mistral_fertility = results.get("LLaMA3.1-Base")
+    reproduced_fertility = results.get("SAVA-MCT")
+    
+    if mistral_fertility is not None and reproduced_fertility is not None:
+        reduction = (mistral_fertility - reproduced_fertility) / mistral_fertility
+        results["Token_Reduction_%"] = reduction * 100
+        print(f"\nToken Fertility Reduction (Reproduced Model): {reduction:.2%}")
+
+
+    # 5. Save CSV
     os.makedirs("results", exist_ok=True)
     print("\nSaving results to CSV")
+    
+    fieldnames = ["Tokenizer", "Fertility"]
+    if "Token_Reduction_%" in results:
+        fieldnames.append("Token_Reduction_%")
+
     with open(OUTPUT_CSV, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["Tokenizer", "Fertility"])
+        writer.writerow(fieldnames)
+        
         for name, avg in results.items():
-            writer.writerow([name, avg])
+            if name not in ["Token_Reduction_%"]:
+                writer.writerow([name, avg])
+        
+        if "Token_Reduction_%" in results:
+            writer.writerow(["Reduction_vs_Base", results["Token_Reduction_%"]])
+
 
     print(f"CSV saved to: {OUTPUT_CSV}")
 
-    # 5. Plot
+    # 6. Plot
     print("Generating plot")
-    names = list(results.keys())
-    values = list(results.values())
+    names_to_plot = [name for name in results.keys() if name not in ["Token_Reduction_%"]]
+    values_to_plot = [results[name] for name in names_to_plot]
 
-    plt.figure(figsize=(10, 6))
-    plt.bar(names, values, color=["gray", "green", "blue", "orange"])
-    plt.title("Token Fertility on adapted tokenizers")
+    plt.figure(figsize=(12, 6))
+    plt.bar(names_to_plot, values_to_plot, color=["gray", "green", "blue", "orange", "purple"])
+    plt.title("Token Fertility Comparison (LLaMA Base vs Adapted vs Reproduced)")
     plt.ylabel("Fertility (tokens per word)")
     plt.savefig(OUTPUT_PLOT)
     plt.show()
